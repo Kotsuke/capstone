@@ -3,14 +3,23 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart'; // Untuk kIsWeb
 import 'package:geolocator/geolocator.dart';
+import 'dart:typed_data'; // Untuk Uint8List (Image.memory)
+
 import '../../../core/services/upload_service.dart';
 import '../../../core/models/post.dart';
+// Asumsi HomeScreen sudah diimpor jika diperlukan untuk findAncestorWidget (tapi kita hindari untuk menjaga kebersihan code)
 
 class UploadScreen extends StatefulWidget {
   final int userId;
+  final void Function() onUploadSuccess; // Callback dari HomeScreen
 
-  const UploadScreen({super.key, required this.userId});
+  const UploadScreen({
+    super.key,
+    required this.userId,
+    required this.onUploadSuccess,
+  });
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
@@ -20,11 +29,14 @@ class _UploadScreenState extends State<UploadScreen> {
   final UploadService _uploadService = UploadService();
   final ImagePicker _picker = ImagePicker();
 
+  // --- STATE VARIABLES ---
   XFile? _image;
+  Uint8List? _imageBytes; // Digunakan khusus untuk preview di Web
   bool _isLoading = false;
   String? _locationMessage;
   double? _lat;
   double? _long;
+  // -----------------------
 
   // 1. Fungsi Ambil Foto (Kamera atau Galeri)
   Future<void> _pickImage(ImageSource source) async {
@@ -32,18 +44,32 @@ class _UploadScreenState extends State<UploadScreen> {
       source: source,
       imageQuality: 70,
     );
-    setState(() {
-      _image = picked;
-      _locationMessage = null; // Reset status lokasi
-    });
+
+    if (picked != null) {
+      if (kIsWeb) {
+        // Jika di Web, baca bytes-nya
+        final bytes = await picked.readAsBytes();
+        setState(() {
+          _imageBytes = bytes;
+          _image = picked;
+          _locationMessage = null;
+        });
+      } else {
+        // Jika di Mobile, cukup simpan XFile
+        setState(() {
+          _imageBytes = null;
+          _image = picked;
+          _locationMessage = null;
+        });
+      }
+    }
   }
 
-  // 2. Fungsi Ambil Lokasi GPS
+  // 2. Fungsi Ambil Lokasi GPS (Dipanggil oleh _submitReport)
   Future<Position> _determinePosition() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // Cek apakah GPS nyala
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       throw Exception('Location services are disabled.');
@@ -61,7 +87,6 @@ class _UploadScreenState extends State<UploadScreen> {
       throw Exception('Location permissions are permanently denied.');
     }
 
-    // Ambil lokasi saat ini
     return await Geolocator.getCurrentPosition();
   }
 
@@ -91,9 +116,8 @@ class _UploadScreenState extends State<UploadScreen> {
         userId: widget.userId,
       );
 
-      // --- LOGIKA VALIDASI AI (Re-take loop) ---
+      // --- LOGIKA VALIDASI AI ---
       if (result.potholeCount == 0) {
-        // ❌ DETEKSI GAGAL: Minta user coba lagi
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -105,13 +129,11 @@ class _UploadScreenState extends State<UploadScreen> {
             duration: Duration(seconds: 5),
           ),
         );
-        // Biarkan _image tetap ada di preview
       } else {
-        // ✅ DETEKSI SUKSES: Lanjut ke tampilan hasil
+        // ✅ DETEKSI SUKSES
         if (!mounted) return;
         _showSuccessDialog(result);
       }
-      // ------------------------------------------
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -123,12 +145,13 @@ class _UploadScreenState extends State<UploadScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _locationMessage = null; // Clear message
+          _locationMessage = null;
         });
       }
     }
   }
 
+  // 4. Fungsi Menampilkan Dialog Sukses
   void _showSuccessDialog(Post post) {
     showDialog(
       context: context,
@@ -154,7 +177,8 @@ class _UploadScreenState extends State<UploadScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.pop(context); // Kembali ke Home/Feed
+              // Panggil callback untuk pindah ke tab Feed
+              widget.onUploadSuccess();
             },
             child: const Text("OK"),
           ),
@@ -172,7 +196,7 @@ class _UploadScreenState extends State<UploadScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // AREA PREVIEW GAMBAR
+              // AREA PREVIEW GAMBAR (LOGIC ADAPTIF WEB/MOBILE)
               Container(
                 height: 300,
                 decoration: BoxDecoration(
@@ -190,10 +214,9 @@ class _UploadScreenState extends State<UploadScreen> {
                       )
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(15),
-                        child: Image.file(
-                          File(_image!.path),
-                          fit: BoxFit.cover,
-                        ),
+                        child: kIsWeb && _imageBytes != null
+                            ? Image.memory(_imageBytes!, fit: BoxFit.cover)
+                            : Image.file(File(_image!.path), fit: BoxFit.cover),
                       ),
               ),
               const SizedBox(height: 20),

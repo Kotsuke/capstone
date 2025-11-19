@@ -1,7 +1,7 @@
 // lib/features/dashboard/home_screen.dart
 
 import 'package:flutter/material.dart';
-import '../auth/login_screen.dart'; // Import LoginScreen untuk navigasi logout
+import '../auth/login_screen.dart';
 import '../feed/feed_screen.dart';
 import '../map/map_screen.dart';
 import '../upload/upload_screen.dart';
@@ -20,15 +20,27 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   late final List<Widget> _screens;
 
+  // FUNGSI BARU: Untuk pindah tab
+  void switchToFeed() {
+    setState(() {
+      _selectedIndex = 0; // Pindah ke tab Feed (Index 0)
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _screens = [
       const FeedScreen(),
       const MapScreen(),
-      UploadScreen(userId: widget.userId),
+      // Meneruskan callback switchToFeed ke UploadScreen
+      UploadScreen(
+        userId: widget.userId,
+        onUploadSuccess: switchToFeed, // <<< CALLBACK DITAMBAHKAN
+      ),
     ];
   }
+  // ... (sisa kode _onItemTapped, _appBarTitle, _logout tetap sama)
 
   void _onItemTapped(int index) {
     setState(() {
@@ -49,14 +61,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // FUNGSI LOGOUT BARU
   void _logout() {
-    // Di aplikasi nyata, ini tempat menghapus token/session lokal.
-    // Di sini, kita hanya navigasi kembali ke LoginScreen dan menghapus semua riwayat.
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const LoginScreen()),
-      (Route<dynamic> route) => false, // Hapus semua rute sebelumnya
+      (Route<dynamic> route) => false,
     );
   }
 
@@ -66,7 +75,6 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(_appBarTitle),
         actions: [
-          // Display User Info
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Center(
@@ -79,13 +87,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          // LOGOUT BUTTON
           IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
-
       body: _screens[_selectedIndex],
-
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Feed'),
