@@ -31,13 +31,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _screens = [
-      const FeedScreen(),
+      FeedScreen(userId: widget.userId), // <-- KIRIM USER ID KE FEEDSCREEN
       const MapScreen(),
-      // Meneruskan callback switchToFeed ke UploadScreen
-      UploadScreen(
-        userId: widget.userId,
-        onUploadSuccess: switchToFeed, // <<< CALLBACK DITAMBAHKAN
-      ),
+      UploadScreen(userId: widget.userId, onUploadSuccess: switchToFeed),
     ];
   }
   // ... (sisa kode _onItemTapped, _appBarTitle, _logout tetap sama)

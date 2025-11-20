@@ -6,23 +6,46 @@ import '../models/map_marker.dart';
 import '../models/post.dart';
 
 class PostService {
-  final Dio _dio = Dio(BaseOptions(baseUrl: AppConfig.baseUrl));
+  final Dio _dio = Dio(
+    BaseOptions(
+      baseUrl: AppConfig.baseUrl,
+      headers: {
+        // Header sakti untuk menembus warning page ngrok
+        "ngrok-skip-browser-warning": "true",
+      },
+    ),
+  );
 
   /// Mengambil semua post detail untuk tampilan Feed.
   Future<List<Post>> fetchPosts() async {
     try {
       final response = await _dio.get('/posts');
 
+      // 🔍 DEBUG: Lihat data mentah di Terminal (Run tab)
+      print("----- START DEBUG DATA -----");
+      print("Status Code: ${response.statusCode}");
+      print("Raw Data: ${response.data}");
+      print("----- END DEBUG DATA -----");
+
       if (response.statusCode == 200 && response.data is List) {
-        // Mapping list JSON menjadi List<Post>
-        return (response.data as List)
-            .map((json) => Post.fromJson(json))
-            .toList();
+        return (response.data as List).map((json) {
+          try {
+            return Post.fromJson(json);
+          } catch (e) {
+            // 🔍 DEBUG: Tangkap item yang bikin error
+            print("❌ ERROR PARSING JSON ITEM: $e");
+            print("DATA YANG GAGAL: $json");
+            throw e; // Lempar ulang agar FutureBuilder tahu
+          }
+        }).toList();
       }
       return [];
     } on DioException catch (e) {
-      print('Error fetching posts: ${e.response?.data}');
+      print('❌ Network Error: ${e.response?.data}');
       throw Exception('Failed to load feed. Network error.');
+    } catch (e) {
+      print('❌ Unknown Error: $e');
+      rethrow;
     }
   }
 

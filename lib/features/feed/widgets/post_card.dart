@@ -47,7 +47,7 @@ class _PostCardState extends State<PostCard> {
     return severity == 'SERIUS' ? Colors.red.shade700 : Colors.green;
   }
 
-  // FUNGSI UTAMA VOTE: Mengirim request ke Flask dan mengupdate UI
+  // FUNGSI UTAMA VOTE
   void _sendVote(String voteType) async {
     if (_isVoting) return;
 
@@ -62,11 +62,9 @@ class _PostCardState extends State<PostCard> {
         voteType: voteType,
       );
 
-      // Update state lokal dengan jumlah vote terbaru dari server
       setState(() {
         _upvotes = newCounts['up'] ?? 0;
         _downvotes = newCounts['down'] ?? 0;
-        // Panggil callback untuk me-refresh data di FeedScreen
         widget.onVote();
       });
     } catch (e) {
@@ -85,8 +83,13 @@ class _PostCardState extends State<PostCard> {
 
   @override
   Widget build(BuildContext context) {
-    // URL gambar disatukan dari base URL Flask dan image path
-    final imageUrl = widget.post.imageUrl;
+    // --- 1. PERBAIKAN URL GAMBAR ---
+    // Ambil nama file dari URL database (misal: img_123.jpg)
+    final String fileName = widget.post.imageUrl.split('/').last;
+
+    // Gabungkan dengan Base URL ngrok yang aktif di AppConfig
+    // Pastikan AppConfig.baseImageUrl diakhiri '/' (contoh: ...ngrok-free.dev/uploads/)
+    final String fixedImageUrl = '${AppConfig.baseImageUrl}$fileName';
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -95,7 +98,7 @@ class _PostCardState extends State<PostCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. HEADER (USER & SEVERITY LABEL)
+          // HEADER (USER & SEVERITY)
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Row(
@@ -109,7 +112,7 @@ class _PostCardState extends State<PostCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.post.uploadedBy, // Menampilkan Full Name
+                      widget.post.uploadedBy,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     Text(
@@ -119,7 +122,6 @@ class _PostCardState extends State<PostCard> {
                   ],
                 ),
                 const Spacer(),
-                // Display Severity Label (Hasil AI)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -154,12 +156,16 @@ class _PostCardState extends State<PostCard> {
             ),
           ),
 
-          // 2. GAMBAR KERUSAKAN (DARI FLASK)
+          // --- 2. IMAGE NETWORK DENGAN HEADER NGROK ---
           Image.network(
-            imageUrl,
+            fixedImageUrl, // Gunakan URL yang sudah diperbaiki
+            // HEADER SAKTI UNTUK NGROK
+            headers: const {"ngrok-skip-browser-warning": "true"},
+
             height: 250,
             width: double.infinity,
             fit: BoxFit.cover,
+
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
               return Container(
@@ -168,18 +174,28 @@ class _PostCardState extends State<PostCard> {
                 child: const Center(child: CircularProgressIndicator()),
               );
             },
+
             errorBuilder: (context, error, stackTrace) {
+              print("❌ Error loading image: $error"); // Debugging di console
               return Container(
                 height: 250,
                 color: Colors.red[100],
-                child: const Center(
-                  child: Text("Failed to load image from server"),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.broken_image, color: Colors.red, size: 40),
+                    SizedBox(height: 8),
+                    Text(
+                      "Gagal memuat gambar",
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ],
                 ),
               );
             },
           ),
 
-          // 3. FOOTER (CAPTION & VOTE BUTTONS)
+          // FOOTER (CAPTION & VOTES)
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
@@ -194,7 +210,7 @@ class _PostCardState extends State<PostCard> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    // TOMBOL THUMBS UP
+                    // THUMBS UP
                     TextButton.icon(
                       onPressed: _isVoting ? null : () => _sendVote('UP'),
                       icon: _isVoting
@@ -206,7 +222,7 @@ class _PostCardState extends State<PostCard> {
                           : const Icon(Icons.thumb_up_alt_outlined, size: 18),
                       label: Text(_upvotes.toString()),
                     ),
-                    // TOMBOL THUMBS DOWN
+                    // THUMBS DOWN
                     TextButton.icon(
                       onPressed: _isVoting ? null : () => _sendVote('DOWN'),
                       icon: _isVoting
