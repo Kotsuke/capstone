@@ -15,6 +15,32 @@ class PostService {
       },
     ),
   );
+  // Ambil post milik user sendiri
+  Future<List<Post>> fetchUserPosts(int userId) async {
+    try {
+      final response = await _dio.get('/users/$userId/posts');
+
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((json) => Post.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('❌ Error fetching user posts: $e');
+      rethrow;
+    }
+  }
+
+  // Hapus post
+  Future<void> deletePost(int postId) async {
+    try {
+      await _dio.delete('/posts/$postId');
+    } catch (e) {
+      print('❌ Error deleting post: $e');
+      throw Exception('Failed to delete post');
+    }
+  }
 
   /// Mengambil semua post detail untuk tampilan Feed.
   Future<List<Post>> fetchPosts() async {

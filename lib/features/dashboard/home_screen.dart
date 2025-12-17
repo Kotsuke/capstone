@@ -5,6 +5,8 @@ import '../auth/login_screen.dart';
 import '../feed/feed_screen.dart';
 import '../map/map_screen.dart';
 import '../upload/upload_screen.dart';
+// Import screen history yang baru kita buat
+import '../profile/my_posts_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final int userId;
@@ -18,12 +20,22 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+
+  // 1. GLOBAL KEY: Kunci rahasia agar HomeScreen bisa "menyuruh" FeedScreen refresh
+  // Pastikan kamu sudah mengubah '_FeedScreenState' menjadi 'FeedScreenState' (Public) di feed_screen.dart
+  final GlobalKey<FeedScreenState> _feedKey = GlobalKey<FeedScreenState>();
+
   late final List<Widget> _screens;
 
-  // FUNGSI BARU: Untuk pindah tab
+  // FUNGSI PINDAH TAB + REFRESH OTOMATIS
   void switchToFeed() {
     setState(() {
       _selectedIndex = 0; // Pindah ke tab Feed (Index 0)
+    });
+
+    // Paksa Feed untuk refresh data terbaru dari server setelah upload sukses
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _feedKey.currentState?.refreshFeed();
     });
   }
 
@@ -31,12 +43,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _screens = [
-      FeedScreen(userId: widget.userId), // <-- KIRIM USER ID KE FEEDSCREEN
+      // 2. PASANG KEY KE FEEDSCREEN
+      FeedScreen(key: _feedKey, userId: widget.userId),
       const MapScreen(),
       UploadScreen(userId: widget.userId, onUploadSuccess: switchToFeed),
     ];
   }
-  // ... (sisa kode _onItemTapped, _appBarTitle, _logout tetap sama)
 
   void _onItemTapped(int index) {
     setState(() {
@@ -71,6 +83,21 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(_appBarTitle),
         actions: [
+          // --- 3. TOMBOL HISTORY / MY POSTS (BARU) ---
+          IconButton(
+            icon: const Icon(Icons.history), // Ikon Jam/History
+            tooltip: 'My Reports',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MyPostsScreen(userId: widget.userId),
+                ),
+              );
+            },
+          ),
+
+          // NAMA USER
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Center(
@@ -83,6 +110,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+
+          // TOMBOL LOGOUT
           IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
